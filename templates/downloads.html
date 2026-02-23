@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+    }
+    .playlist {
+        margin: 20px 0;
+        padding: 15px;
+        background-color: #f5f5f5;
+        border-left: 4px solid #4CAF50;
+        border-radius: 4px;
+    }
+    .playlist h3 {
+        margin-top: 0;
+        color: #2c3e50;
+    }
+    .playlist ul {
+        margin: 10px 0;
+        padding-left: 20px;
+    }
+    .playlist li {
+        margin: 8px 0;
+    }
+    .playlist a {
+        color: #4CAF50;
+        text-decoration: none;
+    }
+    .playlist a:hover {
+        text-decoration: underline;
+    }
+    .single-files {
+        margin: 20px 0;
+    }
+    a.back-link {
+        display: inline-block;
+        margin-top: 20px;
+        padding: 10px 20px;
+        background-color: #4CAF50;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+    }
+    a.back-link:hover {
+        background-color: #45a049;
+    }
+</style>
+<body>
+<h2>Downloads</h2>
+
+{% set playlists = {} %}
+{% set singles = [] %}
+
+{% for r in rows %}
+    {% if r[4] %}
+        {% if r[4] not in playlists %}
+            {% set _ = playlists.__setitem__(r[4], []) %}
+        {% endif %}
+        {% set _ = playlists[r[4]].append((r[1], r[2])) %}
+    {% else %}
+        {% set _ = singles.append((r[1], r[2])) %}
+    {% endif %}
+{% endfor %}
+
+{% if playlists %}
+<h3>📁 Playlists</h3>
+{% for playlist_name, videos in playlists.items() %}
+<div class="playlist">
+    <h3>📂 {{ playlist_name }} <a href="/download-playlist/{{ playlist_name }}" style="font-size: 0.8em; margin-left: 10px;" title="Download all as ZIP">📦 ZIP</a></h3>
+    <ul>
+    {% for title, filename in videos %}
+        <li>{{ title }} - <a href="/file/{{ filename.replace('\\', '/') }}">Download</a></li>
+    {% endfor %}
+    </ul>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if singles %}
+<div class="single-files">
+    <h3>🎵 Individual Downloads</h3>
+    <ul>
+    {% for title, filename in singles %}
+        <li>{{ title }} - <a href="/file/{{ filename.replace('\\', '/') }}">Download</a></li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<a href="/" class="back-link">← Back</a>

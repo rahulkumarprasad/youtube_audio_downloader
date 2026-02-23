@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        input {
+            padding: 8px;
+            width: 300px;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 8px 16px;
+        }
+        </style>
+<body>
+    <div >
+        <p><a style="border: 1px solid black; background-color: aquamarine;" rel="stylesheet" href="/downloads">Donload files</a></p>
+    </div>
+<h2>YouTube Audio Downloader</h2>
+
+<form id="form">
+<input name="url" placeholder="YouTube URL" required>
+<div>
+    <label for="playlists">All playlists</label>
+    <input type="checkbox" id="playlists" name="playlists">
+    <label for="max_songs">Maximum number of songs</label>
+    <input type="number" id="max_songs" name="max_songs" min="1" max="100" value="20">
+</div>
+<button>Download</button>
+</form>
+<br>
+<progress id="bar" value="0" max="100" style="width:300px"></progress>
+<script src="/static/progress.js"></script>
+</body>
+</html>
+
