@@ -2,6 +2,8 @@ import os
 import socket
 import zipfile
 import io
+import threading
+from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_from_directory, send_file
 from downloader.audio_downloader import AudioDownloader
 from database import init_db, get_db, is_duplicate
@@ -9,6 +11,8 @@ from config import DOWNLOAD_PATH
 
 app = Flask(__name__)
 progress = {"value":0}
+active_downloads = {}
+active_downloads_lock = threading.Lock()
 
 # Ensure database is initialized at startup
 init_db()
@@ -33,28 +37,78 @@ def start():
     url = request.form.get("url")
     playlists = request.form.get("playlists") == "on"
     max_songs = request.form.get("max_songs")
-    print("Received download request:", url, "Playlists:", playlists, "Max songs:", max_songs)
+    use_cookies = request.form.get("use_cookies") == "on"
+    browser = request.form.get("browser") or "chrome"
+    cookie_file = request.form.get("cookie_file") or None
+    override = request.form.get("override") in ("true", "1", "on", "yes")
+    print("Received download request:", url, "Playlists:", playlists, "Max songs:", max_songs, "Use cookies:", use_cookies, "Browser:", browser, "Override:", override)
     # Check for duplicates
-    if is_duplicate(url):
-        return jsonify({"status":"duplicate", "message":"This URL has already been downloaded"}), 400
+    if is_duplicate(url) and not override:
+        return jsonify({"status":"duplicate", "message":"This URL has already been downloaded. Choose override to download again."}), 400
+
+    if is_duplicate(url) and override:
+        con = get_db()
+        cur = con.cursor()
+        cur.execute("SELECT filename, folder FROM downloads WHERE url=?", (url,))
+        existing_rows = cur.fetchall()
+        for filename, folder in existing_rows:
+            try:
+                if filename:
+                    full_path = os.path.abspath(os.path.join(DOWNLOAD_PATH, filename))
+                    if full_path.startswith(os.path.abspath(DOWNLOAD_PATH)) and os.path.exists(full_path):
+                        os.remove(full_path)
+            except Exception:
+                pass
+        cur.execute("DELETE FROM downloads WHERE url=?", (url,))
+        con.commit()
+        con.close()
 
     def cb(p):
         progress["value"] = p
+        with active_downloads_lock:
+            if url in active_downloads:
+                active_downloads[url]["progress"] = p
 
-    d = AudioDownloader(progress_callback=cb, playlists=playlists, max_songs=int(max_songs) if max_songs else 100)
-    print("Downloading...", playlists, url)
-    playlist_name, results = d.download(url)
+    with active_downloads_lock:
+        active_downloads[url] = {
+            "url": url,
+            "playlists": playlists,
+            "max_songs": int(max_songs) if max_songs else 100,
+            "status": "running",
+            "started_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "progress": 0,
+        }
 
-    con = get_db()
-    cur = con.cursor()
-    for title, filename in results:
-        # Use INSERT OR IGNORE to avoid UNIQUE constraint errors when the same
-        # playlist URL is associated with multiple files.
-        cur.execute("INSERT OR IGNORE INTO downloads(title,filename,url,folder, zip_file) VALUES(?,?,?,?,?)",(title,filename,url,playlist_name, d.zip_file_path))
-    con.commit()
-    con.close()
+    try:
+        d = AudioDownloader(
+            progress_callback=cb,
+            playlists=playlists,
+            max_songs=int(max_songs) if max_songs else 100,
+            use_cookies=use_cookies,
+            browser=browser,
+            cookie_file=cookie_file,
+        )
+        print("Downloading...", playlists, url)
+        playlist_name, results, skipped = d.download(url)
 
-    return jsonify({"status":"done", "playlist": playlist_name})
+        con = get_db()
+        cur = con.cursor()
+        for title, filename in results:
+            # Use INSERT OR IGNORE to avoid UNIQUE constraint errors when the same
+            # playlist URL is associated with multiple files.
+            cur.execute("INSERT OR IGNORE INTO downloads(title,filename,url,folder, zip_file) VALUES(?,?,?,?,?)",(title,filename,url,playlist_name, d.zip_file_path))
+        con.commit()
+        con.close()
+
+        with active_downloads_lock:
+            if url in active_downloads:
+                active_downloads[url]["status"] = "completed"
+                active_downloads[url]["progress"] = 100
+
+        return jsonify({"status":"done", "playlist": playlist_name, "skipped": skipped})
+    finally:
+        with active_downloads_lock:
+            active_downloads.pop(url, None)
 
 @app.route("/progress")
 def get_progress():
@@ -68,6 +122,12 @@ def downloads():
     rows = cur.fetchall()
     con.close()
     return render_template("downloads.html", rows=rows)
+
+@app.route("/active-downloads")
+def active_downloads_page():
+    with active_downloads_lock:
+        rows = list(active_downloads.values())
+    return render_template("active_downloads.html", rows=rows)
 
 @app.route("/file/<path:filename>")
 def file(filename):

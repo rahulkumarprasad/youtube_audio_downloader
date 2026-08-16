@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Active Downloads</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .download-card {
+            margin: 16px 0;
+            padding: 16px;
+            border: 1px solid #d0d0d0;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .status {
+            font-weight: bold;
+            color: #0a7b00;
+        }
+        progress {
+            width: 100%;
+            max-width: 500px;
+            height: 18px;
+            margin-top: 8px;
+        }
+        a {
+            color: #0056b3;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .nav {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="/">Home</a>
+        &nbsp;|&nbsp;
+        <a href="/downloads">Downloads</a>
+    </div>
+
+    <h2>Active Downloads</h2>
+
+    {% if rows %}
+        {% for item in rows %}
+        <div class="download-card">
+            <div><strong>URL:</strong> {{ item.url }}</div>
+            <div><strong>Mode:</strong> {{ 'Playlist' if item.playlists else 'Single video' }}</div>
+            <div><strong>Started:</strong> {{ item.started_at }}</div>
+            <div class="status">Status: {{ item.status }}</div>
+            <progress value="{{ item.progress }}" max="100"></progress>
+            <div><strong>Progress:</strong> {{ item.progress }}%</div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p>No active downloads right now.</p>
+    {% endif %}
+</body>
+</html>

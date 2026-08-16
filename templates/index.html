@@ -15,8 +15,12 @@
         }
         </style>
 <body>
-    <div >
-        <p><a style="border: 1px solid black; background-color: aquamarine;" rel="stylesheet" href="/downloads">Donload files</a></p>
+    <div>
+        <p>
+            <a style="border: 1px solid black; background-color: aquamarine;" href="/downloads">Download files</a>
+            &nbsp;|&nbsp;
+            <a style="border: 1px solid black; background-color: #dfeeff;" href="/active-downloads">Active downloads</a>
+        </p>
     </div>
 <h2>YouTube Audio Downloader</h2>
 
@@ -28,8 +32,26 @@
     <label for="max_songs">Maximum number of songs</label>
     <input type="number" id="max_songs" name="max_songs" min="1" max="100" value="20">
 </div>
-<button>Download</button>
+<div style="margin: 10px 0;">
+    <label for="use_cookies">Use browser cookies automatically</label>
+    <input type="checkbox" id="use_cookies" name="use_cookies" checked>
+</div>
+<div style="margin-bottom: 10px;">
+    <label for="browser">Browser:</label>
+    <select id="browser" name="browser">
+        <option value="chrome">Chrome</option>
+        <option value="firefox">Firefox</option>
+    </select>
+</div>
+<div style="margin-bottom: 10px;">
+    <label for="cookie_file">Cookie file path (optional):</label><br>
+    <input type="text" id="cookie_file" name="cookie_file" placeholder="C:\\path\\to\\cookies.txt" style="width: 420px;">
+</div>
+<button id="submitBtn">Download</button>
 </form>
+<div id="statusMessage" style="margin-top: 10px; color: #0b5fff; font-weight: bold; min-height: 24px;">
+    Ready to download.
+</div>
 <br>
 <progress id="bar" value="0" max="100" style="width:300px"></progress>
 <script src="/static/progress.js"></script>
