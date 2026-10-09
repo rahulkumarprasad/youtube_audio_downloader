@@ -69,12 +69,25 @@ class AudioDownloader:
         is_playlist = False
         playlist_name = "downloads"
 
+        # Apply the same authentication source to metadata extraction and download.
+        auth_opts = {}
+        if self.use_cookies:
+            if self.cookie_file and os.path.exists(self.cookie_file):
+                auth_opts["cookiefile"] = self.cookie_file
+                print(f"[AudioDownloader.download] Using cookie file: {self.cookie_file}")
+            elif self.browser in ("chrome", "firefox"):
+                auth_opts["cookiesfrombrowser"] = (self.browser,)
+                print(f"[AudioDownloader.download] Using browser cookies from: {self.browser}")
+            else:
+                print("[AudioDownloader.download] Cookie option selected, but no valid cookie source was provided.")
+
         # First pass: get info to determine if playlist and get playlist name
         try:
             print("[AudioDownloader.download] Extracting info from URL...")
             with YoutubeDL({"quiet": True, "no_warnings": True, "socket_timeout": 10,
                 "skip_download": True,
                 "extract_flat": "in_playlist",
+                **auth_opts,
             }) as ydl:
                 info = ydl.extract_info(url, download=False)
                 if isinstance(info, dict):
@@ -101,8 +114,24 @@ class AudioDownloader:
             print("[AudioDownloader.download] No metadata returned by yt-dlp; trying direct download fallback for the URL.")
             is_playlist = False
             playlist_name = "downloads"
+            fallback_opts = {
+                "format": "bestaudio/best",
+                "noplaylist": True,
+                "outtmpl": f"{DOWNLOAD_PATH}/%(title)s.%(ext)s",
+                "restrictfilenames": True,
+                "retries": 2,
+                "socket_timeout": 15,
+                "no_warnings": True,
+                "quiet": True,
+                "postprocessors": [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": AUDIO_FORMAT,
+                    "preferredquality": QUALITY,
+                }],
+                **auth_opts,
+            }
             try:
-                with YoutubeDL(ydl_opts) as ydl_direct:
+                with YoutubeDL(fallback_opts) as ydl_direct:
                     direct_info = ydl_direct.extract_info(url, download=True)
                     if isinstance(direct_info, dict):
                         title = direct_info.get("title", "Unknown")
@@ -110,6 +139,7 @@ class AudioDownloader:
                         relative_path = os.path.basename(filename)
                         print(f"[AudioDownloader.download] Direct fallback succeeded: {title}")
                         return playlist_name, [(title, relative_path)], []
+                    return playlist_name, [], [{"url": url, "reason": "yt-dlp returned no video metadata; check authentication/cookies and try again"}]
             except Exception as e:
                 print(f"[AudioDownloader.download] Direct fallback failed: {str(e)}")
                 return playlist_name, [], [{"url": url, "reason": str(e)}]
@@ -137,15 +167,7 @@ class AudioDownloader:
             }],
         }
 
-        if self.use_cookies:
-            if self.cookie_file and os.path.exists(self.cookie_file):
-                ydl_opts["cookiefile"] = self.cookie_file
-                print(f"[AudioDownloader.download] Using cookie file: {self.cookie_file}")
-            elif self.browser in ("chrome", "firefox"):
-                ydl_opts["cookiesfrombrowser"] = (self.browser,)
-                print(f"[AudioDownloader.download] Using browser cookies from: {self.browser}")
-            else:
-                print("[AudioDownloader.download] Cookie option selected, but no valid cookie source was provided.")
+        ydl_opts.update(auth_opts)
 
         print(f"[AudioDownloader.download] YDL options configured")
 
@@ -259,6 +281,10 @@ class AudioDownloader:
                 with YoutubeDL(ydl_opts) as ydl:
                     print(f"[AudioDownloader.download] Extracting video info...")
                     info = ydl.extract_info(url, download=True)
+                    if not isinstance(info, dict):
+                        reason = "yt-dlp returned no video metadata; YouTube may require valid cookies or may be temporarily rate-limiting requests"
+                        print(f"[AudioDownloader.download] {reason}")
+                        return playlist_name, [], [{"url": url, "reason": reason}]
                     title = info.get("title", "Unknown")
                     filename = ydl.prepare_filename(info).rsplit(".",1)[0] + f".{AUDIO_FORMAT}"
                     relative_path = os.path.basename(filename)
